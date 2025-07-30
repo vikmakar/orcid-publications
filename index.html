@@ -3,18 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <title>Team Publications</title>
+<p>Note: Author shown is a team member; they may not be the first author.</p>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: auto; }
-    details summary { font-size: 1.5em; cursor: pointer; margin-top: 1em; background-color: #f0f0f0; padding: 5px; }
-    details[open] summary { font-weight: bold; }
-    h3 { margin-top: 1em; }
-    li { margin-bottom: 0.8em; }
+    h1 { margin-top: 1em; }
+    details summary {
+      font-size: 1.2em;
+      cursor: pointer;
+      background: #f2f2f2;
+      padding: 10px;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+    .subgroup summary {
+      font-size: 1em;
+      padding: 6px 10px;
+      background: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 0.5em; }
   </style>
 </head>
 <body>
   <h1>Our Research Publications</h1>
-<p>Note: Author shown is a team member; they may not be the first author.</p>
-  <div id="publications"></div>
+  <div id="publications">Loading...</div>
 
   <script>
     const orcids = [
@@ -24,60 +38,83 @@
       { id: "0000-0001-8977-9257", name: "Simon J. Holder" },
     ];
 
-    async function fetchPublications(orcid) {
-      const response = await fetch(`https://pub.orcid.org/v3.0/${orcid.id}/works`, {
-        headers: { Accept: "application/json" },
+    const typeMap = {
+      "journal-article": "Journal",
+      "book-chapter": "Book",
+      "book": "Book",
+      "conference-paper": "Conference",
+    };
+
+    async function fetchWorks(orcidId) {
+      const response = await fetch(`https://pub.orcid.org/v3.0/${orcidId}/works`, {
+        headers: { Accept: "application/json" }
       });
       const data = await response.json();
       const works = data.group || [];
 
       return works.map(w => {
         const summary = w["work-summary"][0];
-        const title = summary["title"]?.["title"]?.["value"] || "Untitled";
+        const title = summary.title?.title?.value?.trim();
         const year = summary["publication-date"]?.year?.value || "n.d.";
-        const type = summary["type"] || "other";
-        return {
-          title,
-          year,
-          type,
-          orcid: `${orcid.name} (group author) et al.`
-        };
+        const rawType = summary.type || "other";
+        const type = typeMap[rawType] || "Other";
+        return { title, year, type };
       });
     }
 
-    function groupBy(arr, key) {
-      return arr.reduce((acc, item) => {
-        const val = item[key] || "n.d.";
-        if (!acc[val]) acc[val] = [];
-        acc[val].push(item);
-        return acc;
-      }, {});
+    function deduplicate(publications) {
+      const seen = new Set();
+      return publications.filter(pub => {
+        const key = `${pub.title}-${pub.year}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function groupByYearAndType(publications) {
+      const grouped = {};
+      for (const pub of publications) {
+        if (!grouped[pub.year]) grouped[pub.year] = { Journal: [], Book: [], Conference: [], Other: [] };
+        grouped[pub.year][pub.type].push(pub);
+      }
+      return grouped;
+    }
+
+    function renderSubgroup(label, items) {
+      if (items.length === 0) return "";
+      const list = items.map(pub => `<li><strong>${pub.title}</strong></li>`).join("");
+      return `<details class="subgroup" open><summary>${label}</summary><ul>${list}</ul></details>`;
+    }
+
+    function renderGrouped(grouped) {
+      const years = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+      return years.map(year => {
+        const subgroups = grouped[year];
+        return `
+          <details>
+            <summary>${year}</summary>
+            ${renderSubgroup("Journal Articles", subgroups.Journal)}
+            ${renderSubgroup("Books & Chapters", subgroups.Book)}
+            ${renderSubgroup("Conference Papers", subgroups.Conference)}
+            ${renderSubgroup("Other", subgroups.Other)}
+          </details>
+        `;
+      }).join("");
     }
 
     async function showAll() {
       const container = document.getElementById("publications");
-      const all = (await Promise.all(orcids.map(fetchPublications))).flat();
-      const byYear = groupBy(all, "year");
-
-      const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
-      const html = sortedYears.map(year => {
-        const yearPubs = byYear[year];
-        const byType = groupBy(yearPubs, "type");
-
-        return `
-          <details>
-            <summary>${year}</summary>
-            ${Object.entries(byType).map(([type, pubs]) => `
-              <h3>${type.charAt(0).toUpperCase() + type.slice(1)}</h3>
-              <ul>
-                ${pubs.map(p => `<li><strong>${p.title}</strong> – ${p.orcid}</li>`).join("")}
-              </ul>
-            `).join("")}
-          </details>
-        `;
-      }).join("");
-
-      container.innerHTML = html;
+      try {
+        const allWorks = await Promise.all(orcids.map(o => fetchWorks(o.id)));
+        const flat = allWorks.flat();
+        const unique = deduplicate(flat);
+        const grouped = groupByYearAndType(unique);
+        container.innerHTML = renderGrouped(grouped);
+      } catch (err) {
+        container.innerHTML = "Failed to load publications.";
+        console.error(err);
+      }
     }
 
     showAll();
