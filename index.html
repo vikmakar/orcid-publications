@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Publications</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: auto; }
+    h2 { margin-top: 2em; }
+    li { margin-bottom: 0.8em; }
+  </style>
+</head>
+<body>
+  <h1>Our Research Publications</h1>
+  <div id="publications"></div>
+
+  <script>
+    const orcids = [
+      { id: "0000-0002-5022-6150", name: "Viktorija Makarovaite" },
+      { id: "0000-0002-2373-6788", name: "Campbell W. Gourlay" },
+      { id: "0000-0002-5139-5765", name: "John C. Batchelor" },
+      { id: "0000-0001-8977-9257", name: "Simon J. Holder" },
+    ];
+
+    async function fetchPublications(orcid) {
+      const response = await fetch(`https://pub.orcid.org/v3.0/${orcid.id}/works`, {
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json();
+      const works = data.group || [];
+
+      const items = works.map(w => {
+        const title = w["work-summary"][0]["title"]["title"]["value"];
+        const year = w["work-summary"][0]["publication-date"]?.year?.value || "n.d.";
+        return `<li><strong>${title}</strong> (${year})</li>`;
+      });
+
+      return `
+        <h2>${orcid.name}</h2>
+        <ul>${items.join("")}</ul>
+      `;
+    }
+
+    async function showAll() {
+      const container = document.getElementById("publications");
+      const sections = await Promise.all(orcids.map(fetchPublications));
+      container.innerHTML = sections.join("");
+    }
+
+    showAll();
+  </script>
+</body>
+</html>
