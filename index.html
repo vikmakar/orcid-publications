@@ -23,13 +23,6 @@
       { id: "0000-0001-8977-9257", name: "Simon J. Holder" },
     ];
 
-    async function fetchWorkDetails(orcidId, putCode) {
-      const response = await fetch(`https://pub.orcid.org/v3.0/${orcidId}/work/${putCode}`, {
-        headers: { Accept: "application/json" },
-      });
-      return response.json();
-    }
-
     async function fetchPublications(orcid) {
       const response = await fetch(`https://pub.orcid.org/v3.0/${orcid.id}/works`, {
         headers: { Accept: "application/json" },
@@ -37,38 +30,18 @@
       const data = await response.json();
       const works = data.group || [];
 
-      const detailedWorks = await Promise.all(
-        works.map(async (w) => {
-          const summary = w["work-summary"][0];
-          const putCode = summary["put-code"];
-          const details = await fetchWorkDetails(orcid.id, putCode);
-
-          const title = summary["title"]?.["title"]?.["value"] || "Untitled";
-          const year = summary["publication-date"]?.year?.value || "n.d.";
-          const type = summary["type"] || "other";
-          const externalIds = summary["external-ids"]?.["external-id"] || [];
-          const doi = externalIds.find(id => id["external-id-type"] === "doi")?.["external-id-value"];
-
-          const contributors = details?.contributors?.contributor || [];
-          let authorDisplay = "";
-          if (contributors.length > 0) {
-            const first = contributors[0]?.["credit-name"]?.value || contributors[0]?.["contributor-orcid"]?.path || "Unknown";
-            authorDisplay = contributors.length > 1 ? `${first} et al.` : first;
-          } else {
-            authorDisplay = `${orcid.name} et al.`; // fallback
-          }
-
-          return {
-            title,
-            year,
-            type,
-            doi,
-            orcid: authorDisplay
-          };
-        })
-      );
-
-      return detailedWorks;
+      return works.map(w => {
+        const summary = w["work-summary"][0];
+        const title = summary["title"]?.["title"]?.["value"] || "Untitled";
+        const year = summary["publication-date"]?.year?.value || "n.d.";
+        const type = summary["type"] || "other";
+        return {
+          title,
+          year,
+          type,
+          orcid: `${orcid.name} et al.`
+        };
+      });
     }
 
     function groupBy(arr, key) {
@@ -83,17 +56,8 @@
     async function showAll() {
       const container = document.getElementById("publications");
       const all = (await Promise.all(orcids.map(fetchPublications))).flat();
+      const byYear = groupBy(all, "year");
 
-      // Remove duplicates by title
-      const seen = new Set();
-      const unique = all.filter(p => {
-        const key = p.title.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-      const byYear = groupBy(unique, "year");
       const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
       const html = sortedYears.map(year => {
         const yearPubs = byYear[year];
@@ -105,12 +69,7 @@
             ${Object.entries(byType).map(([type, pubs]) => `
               <h3>${type.charAt(0).toUpperCase() + type.slice(1)}</h3>
               <ul>
-                ${pubs.map(p => {
-                  const titleText = p.doi
-                    ? `<a href="https://doi.org/${p.doi}" target="_blank"><strong>${p.title}</strong></a>`
-                    : `<strong>${p.title}</strong>`;
-                  return `<li>${titleText} – ${p.orcid}</li>`;
-                }).join("")}
+                ${pubs.map(p => `<li><strong>${p.title}</strong> – ${p.orcid}</li>`).join("")}
               </ul>
             `).join("")}
           </details>
@@ -122,5 +81,3 @@
 
     showAll();
   </script>
-</body>
-</html>
