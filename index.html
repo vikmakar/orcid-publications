@@ -35,16 +35,21 @@
         const title = summary["title"]?.["title"]?.["value"] || "Untitled";
         const year = summary["publication-date"]?.year?.value || "n.d.";
         const type = summary["type"] || "other";
+
         const contributors = summary["contributors"]?.["contributor"] || [];
-        const allAuthors = contributors.map(c => c["credit-name"]?.["value"]).filter(Boolean);
+        const allAuthors = contributors
+          .map(c => c["credit-name"]?.["value"])
+          .filter(Boolean);
+
         const authorString = allAuthors.length > 1
           ? `${allAuthors[0]} et al.`
           : allAuthors[0] || orcid.name;
-return {
-  title,
-  year,
-  type,
-  orcid: `${firstAuthor} et al.`
+
+        return {
+          title,
+          year,
+          type,
+          orcid: authorString
         };
       });
     }
@@ -58,19 +63,21 @@ return {
       }, {});
     }
 
+    function removeDuplicates(publications) {
+      const seen = new Set();
+      return publications.filter(pub => {
+        const key = pub.title.toLowerCase().trim();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
     async function showAll() {
       const container = document.getElementById("publications");
-      const allRaw = (await Promise.all(orcids.map(fetchPublications))).flat();
-
-// Remove duplicates by title (case-insensitive, trimmed)
-const seenTitles = new Set();
-const all = allRaw.filter(pub => {
-  const normalisedTitle = pub.title.trim().toLowerCase();
-  if (seenTitles.has(normalisedTitle)) return false;
-  seenTitles.add(normalisedTitle);
-  return true;
-});
-      const byYear = groupBy(all, "year");
+      const all = (await Promise.all(orcids.map(fetchPublications))).flat();
+      const unique = removeDuplicates(all);
+      const byYear = groupBy(unique, "year");
 
       const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
       const html = sortedYears.map(year => {
@@ -97,4 +104,3 @@ const all = allRaw.filter(pub => {
   </script>
 </body>
 </html>
-
