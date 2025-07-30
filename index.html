@@ -35,11 +35,14 @@
         const title = summary["title"]?.["title"]?.["value"] || "Untitled";
         const year = summary["publication-date"]?.year?.value || "n.d.";
         const type = summary["type"] || "other";
-        return {
-          title,
-          year,
-          type,
-          orcid: `${orcid.name} et al.`
+        const contributors = summary["contributors"]?.["contributor"] || [];
+        const firstAuthor = contributors[0]?.["credit-name"]?.["value"] || orcid.name;
+
+return {
+  title,
+  year,
+  type,
+  orcid: `${firstAuthor} et al.`
         };
       });
     }
