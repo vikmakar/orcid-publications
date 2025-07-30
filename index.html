@@ -35,11 +35,17 @@
         const title = summary["title"]?.["title"]?.["value"] || "Untitled";
         const year = summary["publication-date"]?.year?.value || "n.d.";
         const type = summary["type"] || "other";
-        return {
-          title,
-          year,
-          type,
-          orcid: `${orcid.name} et al.`
+        
+          const externalIds = summary["external-ids"]?.["external-id"] || [];
+  const doiEntry = externalIds.find(id => id["external-id-type"] === "doi");
+  const doi = doiEntry ? doiEntry["external-id-value"] : null;
+
+  return {
+    title,
+    year,
+    type,
+    orcid: orcid.name,
+    doi
         };
       });
     }
@@ -69,9 +75,10 @@
             ${Object.entries(byType).map(([type, pubs]) => `
               <h3>${type.charAt(0).toUpperCase() + type.slice(1)}</h3>
               <ul>
-                ${pubs.map(p => `<li><strong>${p.title}</strong> – ${p.orcid}</li>`).join("")}
-              </ul>
-            `).join("")}
+                ${pubs.map(p =>  <li>
+    <strong>${p.doi ? `<a href="https://doi.org/${p.doi}" target="_blank">${p.title}</a>` : p.title}</strong> – ${p.orcid}
+  </li>
+`).join("")}
           </details>
         `;
       }).join("");
