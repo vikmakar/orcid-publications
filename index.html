@@ -55,7 +55,16 @@
 
     async function showAll() {
       const container = document.getElementById("publications");
-      const all = (await Promise.all(orcids.map(fetchPublications))).flat();
+      const allRaw = (await Promise.all(orcids.map(fetchPublications))).flat();
+
+// Remove duplicates by title (case-insensitive, trimmed)
+const seenTitles = new Set();
+const all = allRaw.filter(pub => {
+  const normalisedTitle = pub.title.trim().toLowerCase();
+  if (seenTitles.has(normalisedTitle)) return false;
+  seenTitles.add(normalisedTitle);
+  return true;
+});
       const byYear = groupBy(all, "year");
 
       const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
