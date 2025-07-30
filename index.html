@@ -36,8 +36,10 @@
         const year = summary["publication-date"]?.year?.value || "n.d.";
         const type = summary["type"] || "other";
         const contributors = summary["contributors"]?.["contributor"] || [];
-        const firstAuthor = contributors[0]?.["credit-name"]?.["value"] || orcid.name;
-
+        const allAuthors = contributors.map(c => c["credit-name"]?.["value"]).filter(Boolean);
+        const authorString = allAuthors.length > 1
+          ? `${allAuthors[0]} et al.`
+          : allAuthors[0] || orcid.name;
 return {
   title,
   year,
