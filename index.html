@@ -57,7 +57,8 @@
         const year = summary["publication-date"]?.year?.value || "n.d.";
         const rawType = summary.type || "other";
         const type = typeMap[rawType] || "Other";
-        return { title, year, type };
+        const doi = summary.external-ids?.["external-id"]?.find(eid => eid["external-id-type"] === "doi")?.["external-id-value"];
+        return { title, year, type, doi };
       });
     }
 
@@ -82,7 +83,13 @@
 
     function renderSubgroup(label, items) {
       if (items.length === 0) return "";
-      const list = items.map(pub => `<li><strong>${pub.title}</strong></li>`).join("");
+      const list = items.map(pub => {
+        const link = pub.doi ? `https://doi.org/${pub.doi}` : null;
+        const titleHTML = link
+          ? `<a href="${link}" target="_blank" rel="noopener noreferrer"><strong>${pub.title}</strong></a>`
+          : `<strong>${pub.title}</strong>`;
+        return `<li>${titleHTML}</li>`;
+      }).join("");
       return `<details class="subgroup" open><summary>${label}</summary><ul>${list}</ul></details>`;
     }
 
@@ -117,6 +124,10 @@
     }
 
     showAll();
+  </script>
+</body>
+</html>
+
   </script>
 </body>
 </html>
